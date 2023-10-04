@@ -1,10 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  ChevronDownIcon,
-  LinkBreak2Icon,
-} from "@radix-ui/react-icons";
+import { ChevronDownIcon, LinkBreak2Icon } from "@radix-ui/react-icons";
 import { useEffect, useState } from "react";
 import ReceivedStream from "./ReceivedStream";
 import CreatedStreamList, { Stream } from "./CreatedStreamList";
@@ -22,11 +19,7 @@ import ReceivedStreamSkeleton from "./ReceivedStreamSkeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BarLoader } from "react-spinners";
 import { NoWalletConnected } from "@/components/NoWalletConnected";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import StreamCreator from "./StreamCreator";
 
 enum Sort {
@@ -97,6 +90,7 @@ export default function ClaimerPage() {
         setAreStreamsLoading(false);
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, connected, txnInProgress]);
 
   /* 
@@ -106,15 +100,55 @@ export default function ClaimerPage() {
     /*
       TODO #5: Validate the account is defined before continuing. If not, return.
     */
+    if (!account) {
+      return {
+        Pending: [],
+        Completed: [],
+        Active: [],
+      };
+    }
 
     /* 
       TODO #6: Set the areStreamsLoading state variable to true
     */
+    setAreStreamsLoading(true);
 
     /*
       TODO #7: Make a request to the view function `get_receivers_streams` to retrieve the streams sent by 
             the user.
     */
+    let res: any;
+    try {
+      const body = {
+        function: "get_receivers_streams",
+        type_arguments: ["receiver_address"],
+        arguments: [account.address],
+      };
+      res = await fetch(`https://fullnode.testnet.aptoslabs.com/v1/view`, {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      });
+      if (!res.ok) {
+        // throw new Error(`Error: ${res.status}`);
+        console.log("Something went wrong");
+        return {
+          Pending: [],
+          Completed: [],
+          Active: [],
+        };
+      }
+    } catch (err) {
+      console.log(err);
+      return {
+        Pending: [],
+        Completed: [],
+        Active: [],
+      };
+    }
 
     /* 
       TODO #8: Parse the response from the view request and create an object containing an array of 
@@ -127,10 +161,50 @@ export default function ClaimerPage() {
         - Mark a stream as completed if the start timestamp + duration is less than the current time
         - Mark a stream as active if it is not pending or completed
     */
+    const pendingStreams = [];
+    const completedStreams = [];
+    const activeStreams = [];
+    const currentTime = Date.now();
+
+    for (let stream of res) {
+      const amount = parseFloat(stream.stream_amounts);
+      const startTime = stream.start_timestamp_seconds * 1000;
+      const endTime = startTime + stream.duration_in_seconds * 1000;
+
+      if (startTime === 0) {
+        pendingStreams.push({
+          sender: stream.sender_addresses,
+          startTimestampMilliseconds: startTime,
+          durationMilliseconds: stream.duration_in_seconds * 1000,
+          amountAptFloat: amount,
+          streamId: stream.stream_ids,
+          recipient: "", // Keeping the recipient empty as I couldn't figure out what to send here
+        });
+      } else if (endTime < currentTime) {
+        completedStreams.push({
+          sender: stream.sender_addresses,
+          startTimestampMilliseconds: startTime,
+          durationMilliseconds: stream.duration_in_seconds * 1000,
+          amountAptFloat: amount,
+          streamId: stream.stream_ids,
+          recipient: "", // Keeping the recipient empty as I couldn't figure out what to send here
+        });
+      } else {
+        activeStreams.push({
+          sender: stream.sender_addresses,
+          startTimestampMilliseconds: startTime,
+          durationMilliseconds: stream.duration_in_seconds * 1000,
+          amountAptFloat: amount,
+          streamId: stream.stream_ids,
+          recipient: "", // Keeping the recipient empty as I couldn't figure out what to send here
+        });
+      }
+    }
+
     return {
-      Pending: [],
-      Completed: [],
-      Active: [],
+      Pending: pendingStreams,
+      Completed: completedStreams,
+      Active: activeStreams,
     };
   };
 
@@ -143,8 +217,7 @@ export default function ClaimerPage() {
 
   return (
     <>
-      {
-        /* 
+      {/* 
           TODO #1: Display a loading indicator if a transaction is in progress. Use the given component to display the loading indicator.
 
           HINT:
@@ -157,12 +230,18 @@ export default function ClaimerPage() {
               <p className="text-lg font-medium">Processing Transaction</p>
             </div>
           </div>
-        */
-      }
+        */}
+      {txnInProgress && (
+        <div className="bg-neutral-900/50 backdrop-blur absolute top-0 bottom-0 left-0 right-0 z-50 m-auto flex items-center justify-center">
+          <div className="p-6 flex flex-col items-center justify-center space-y-4">
+            <BarLoader color="#10B981" />
+            <p className="text-lg font-medium">Processing Transaction</p>
+          </div>
+        </div>
+      )}
 
       <>
-        {
-          /* 
+        {/* 
             TODO #2: Display an error message if the wallet is connected to the wrong network. Use the 
                   given components to display the message.
             
@@ -181,8 +260,22 @@ export default function ClaimerPage() {
                 this app.
               </AlertDescription>
             </Alert>
-          */
-        }
+
+            Here I am assuming we want the alert when the network.name is not equal to Testnet
+          */}
+        {!isLoading &&
+          connected &&
+          network &&
+          network.name.toString() !== "Testnet" && (
+            <Alert variant="destructive" className="w-fit mb-2 mr-2">
+              <LinkBreak2Icon className="h-4 w-4" />
+              <AlertTitle>Switch your network!</AlertTitle>
+              <AlertDescription>
+                You need to switch your network to Testnet before you can use
+                this app.
+              </AlertDescription>
+            </Alert>
+          )}
 
         {!isLoading &&
           connected &&
@@ -336,8 +429,7 @@ export default function ClaimerPage() {
                     </div>
                   )}
 
-                  {
-                    /* 
+                  {/* 
                       TODO #3: Display a message if there are no incoming payments of the selected status. 
                             Use the given components to display the message.
 
@@ -357,11 +449,21 @@ export default function ClaimerPage() {
                           You do not have any {status.toLowerCase()} payments.
                         </p>
                       </div>
-                    */
-                  }
+                    */}
+                  {streams[status].length === 0 &&
+                    !isLoading &&
+                    !areStreamsLoading && (
+                      <div className="flex flex-col space-y-1 items-center justify-center w-full bg-neutral-400 border border-neutral-300 py-12 px-6 font-matter rounded-lg">
+                        <p className="text-2xl font-medium">
+                          No Incoming Payments
+                        </p>
+                        <p className="text-neutral-100 text-lg">
+                          You do not have any {status.toLowerCase()} payments.
+                        </p>
+                      </div>
+                    )}
 
-                  {
-                    /*
+                  {/*
                       TODO #4: Display the incoming payments of the selected status. Use the given components to display the streams. 
                               Sort the streams based on the selected sorting method.
 
@@ -427,8 +529,69 @@ export default function ClaimerPage() {
                             }
                           })}
                       </div>
-                    */
-                  }
+                    */}
+                  {!areStreamsLoading && !isLoading && (
+                    <div className="grid grid-cols-1 gap-5 xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 w-full">
+                      {streams[status]
+                        .sort((a, b) => {
+                          switch (sort) {
+                            case Sort.MostRecent:
+                              // Sort streams by most recent using streamId
+                              return b.streamId - a.streamId;
+                            case Sort.Oldest:
+                              // Sort streams by oldest using streamId
+                              return a.streamId - b.streamId;
+                            case Sort.TotalAmountHightToLow:
+                              // Sort streams by total amount high to low
+                              return b.amountAptFloat - a.amountAptFloat;
+                            case Sort.TotalAmountLowToHigh:
+                              // Sort streams by total amount low to high
+                              return a.amountAptFloat - b.amountAptFloat;
+                            case Sort.EndDateFarToClose:
+                              // Sort streams by end date far to close using startTimestampSeconds
+                              return (
+                                a.startTimestampMilliseconds / 1000 -
+                                b.startTimestampMilliseconds / 1000
+                              );
+                            case Sort.EndDateCloseToFar:
+                              // Sort streams by end date close to far using startTimestampSeconds
+                              return (
+                                b.startTimestampMilliseconds / 1000 -
+                                a.startTimestampMilliseconds / 1000
+                              );
+                            case Sort.ClaimableAmountHighToClose:
+                              // Sort streams by claimable amount high to close using durationSeconds
+                              return (
+                                a.durationMilliseconds / 1000 -
+                                b.durationMilliseconds / 1000
+                              );
+                            case Sort.ClaimableAmountCloseToHigh:
+                              // Sort streams by claimable amount close to high using durationSeconds
+                              return (
+                                b.durationMilliseconds / 1000 -
+                                a.durationMilliseconds / 1000
+                              );
+                            default:
+                              // Sort streams by most recent (default) using streamId
+                              return b.streamId - a.streamId;
+                          }
+                        })
+                        .map((stream) => (
+                          <ReceivedStream
+                            key={stream.streamId}
+                            isTxnInProgress={txnInProgress}
+                            setTxn={setTxnInProgress}
+                            senderAddress={stream.sender}
+                            amountAptFloat={stream.amountAptFloat}
+                            durationSeconds={stream.durationMilliseconds / 1000}
+                            startTimestampSeconds={
+                              stream.startTimestampMilliseconds / 1000
+                            }
+                            streamId={stream.streamId}
+                          />
+                        ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

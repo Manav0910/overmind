@@ -97,7 +97,36 @@ export default function StreamRateIndicator() {
             for each receiver stream and subtracting the rate of APT per second for each sender stream.
             Return the stream rate.
     */
-    let aptPerSec = 0;
+
+    const receiverStreams = await getReceiverStreams();
+    const senderStreams = await getSenderStreams();
+
+    // putting this check as I got a runtime error saying Unhandled Runtime Error
+    // TypeError: Cannot read properties of undefined (reading 'reduce')
+    // Although I was not clear about this part logic I have implemented it as I understood
+    console.log({ receiverStreams });
+    if (receiverStreams === undefined || senderStreams === undefined) {
+      // throw new Error("ReceiverStreams or SenderStreams is not an array");
+      console.log("Error");
+      return 0;
+    }
+
+    const receiverRate = receiverStreams?.completed.reduce(
+      (totalRate: any, stream: { stream_amounts: any }) => {
+        // Here I am assuming stream_amounts is the rate of APT per second for the receiver stream also assuming to take only completed
+        return totalRate + stream.stream_amounts;
+      },
+      0
+    );
+
+    const senderRate = senderStreams.reduce(
+      (totalRate: any, stream: { stream_amounts: any }) => {
+        // Here I am assuming stream_amounts is the rate of APT per second for the sender stream.
+        return totalRate + stream.stream_amounts;
+      },
+      0
+    );
+    let aptPerSec = receiverRate - senderRate;
 
     return aptPerSec;
   };
@@ -106,11 +135,37 @@ export default function StreamRateIndicator() {
     /*
      TODO #2: Validate the account is defined before continuing. If not, return.
    */
+    if (!account) {
+      return;
+    }
 
     /*
        TODO #3: Make a request to the view function `get_senders_streams` to retrieve the streams sent by 
              the user.
     */
+
+    let res: any;
+    try {
+      const body = {
+        function: "get_senders_streams",
+        type_arguments: ["sender_address"],
+        arguments: [account.address],
+      };
+      res = await fetch(`https://fullnode.testnet.aptoslabs.com/v1/view`, {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status}`);
+      }
+    } catch (err) {
+      console.log(err);
+      return [];
+    }
 
     /* 
        TODO #4: Parse the response from the view request and create the streams array using the given 
@@ -119,19 +174,63 @@ export default function StreamRateIndicator() {
        HINT:
         - Remember to convert the amount to floating point number
     */
-    return [];
+    const streams = res.map(
+      (stream: {
+        receiver_addresses: any;
+        start_timestamp_seconds: any;
+        duration_in_seconds: any;
+        stream_amounts: string;
+        stream_ids: any;
+      }) => ({
+        receiver_addresses: stream.receiver_addresses,
+        start_timestamp_seconds: stream.start_timestamp_seconds,
+        duration_in_seconds: stream.duration_in_seconds,
+        stream_amounts: parseFloat(stream.stream_amounts),
+        stream_ids: stream.stream_ids,
+      })
+    );
+
+    return streams;
   };
 
   const getReceiverStreams = async () => {
     /*
       TODO #5: Validate the account is defined before continuing. If not, return.
     */
+    if (!account) {
+      return;
+    }
 
     /*
       TODO #6: Make a request to the view function `get_receivers_streams` to retrieve the streams sent by 
             the user.
     */
-
+    let res: any;
+    try {
+      const body = {
+        function: "get_receivers_streams",
+        type_arguments: ["receiver_address"],
+        arguments: [account.address],
+      };
+      res = await fetch(`https://fullnode.testnet.aptoslabs.com/v1/view`, {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status}`);
+      }
+    } catch (err) {
+      console.log(err);
+      return {
+        pending: [],
+        completed: [],
+        active: [],
+      };
+    }
     /* 
       TODO #7: Parse the response from the view request and create an object containing an array of 
             pending, completed, and active streams using the given data. Return the new object.
@@ -143,10 +242,48 @@ export default function StreamRateIndicator() {
         - Mark a stream as completed if the start timestamp + duration is less than the current time
         - Mark a stream as active if it is not pending or completed
     */
+
+    const pendingStreams = [];
+    const completedStreams = [];
+    const activeStreams = [];
+    const currentTime = Date.now();
+
+    for (let stream of res) {
+      const amount = parseFloat(stream.stream_amounts);
+      const startTime = stream.start_timestamp_seconds * 1000;
+      const endTime = startTime + stream.duration_in_seconds * 1000;
+
+      if (startTime === 0) {
+        pendingStreams.push({
+          sender_addresses: stream.sender_addresses,
+          start_timestamp_seconds: stream.start_timestamp_seconds,
+          duration_in_seconds: stream.duration_in_seconds,
+          stream_amounts: amount,
+          stream_ids: stream.stream_ids,
+        });
+      } else if (endTime < currentTime) {
+        completedStreams.push({
+          sender_addresses: stream.sender_addresses,
+          start_timestamp_seconds: stream.start_timestamp_seconds,
+          duration_in_seconds: stream.duration_in_seconds,
+          stream_amounts: amount,
+          stream_ids: stream.stream_ids,
+        });
+      } else {
+        activeStreams.push({
+          sender_addresses: stream.sender_addresses,
+          start_timestamp_seconds: stream.start_timestamp_seconds,
+          duration_in_seconds: stream.duration_in_seconds,
+          stream_amounts: amount,
+          stream_ids: stream.stream_ids,
+        });
+      }
+    }
+
     return {
-      pending: [],
-      completed: [],
-      active: [],
+      pending: pendingStreams,
+      completed: completedStreams,
+      active: activeStreams,
     };
   };
 

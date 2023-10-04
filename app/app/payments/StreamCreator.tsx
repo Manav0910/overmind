@@ -4,9 +4,7 @@ import { Label } from "@/components/ui/label";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import {
-  QuestionMarkCircledIcon,
-} from "@radix-ui/react-icons";
+import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 import { Types } from "aptos";
 import { useState } from "react";
 import {
@@ -81,18 +79,30 @@ export default function StreamCreator(props: {
       TODO #1: Validate the address, amount, and date are all defined before continuing. Return early 
             if any of the variables are undefined.
     */
+    if (!address || !amount || !duration) {
+      return;
+    }
 
     /* 
       TODO #2: Return early if the amount is not a number or is less than 0.
     */
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount < 0) {
+      return;
+    }
 
     /* 
       TODO #3: Set the isTxnInProgress prop to true
     */
+    props.setTxn(true);
 
     /* 
       TODO #4: Reset the address, amount, and date state variables
     */
+
+    setAddress("");
+    setAmount("1");
+    setDuration("");
 
     /* 
       TODO #5: Create the payload for the create_stream transaction
@@ -102,6 +112,16 @@ export default function StreamCreator(props: {
           with 8 decimal places.
         - The date is in milliseconds, but the transaction expects seconds.
     */
+    const body = {
+      type: "FunctionCall",
+      function: "create_stream",
+      type_arguments: ["receiver_address", "amount", "duration_in_seconds"],
+      arguments: [
+        address,
+        Math.floor(parseFloat(amount)),
+        parseInt(duration, 10) / 1000,
+      ],
+    };
 
     /* 
       TODO #6: In a try/catch block, sign and submit the transaction using the signAndSubmitTransaction
@@ -128,11 +148,33 @@ export default function StreamCreator(props: {
         ),
       });
     */
+    try {
+      const res = await signAndSubmitTransaction(body);
+      if (!res.ok) {
+        props.setTxn(false);
+        return;
+      }
+      toast({
+        title: "Stream created!",
+        description: `Stream created: to ${`${address.slice(
+          0,
+          6
+        )}...${address.slice(-4)}`} for ${amount} APT`,
+        action: (
+          <a href={`PLACEHOLDER: Insert the explorer URL here`} target="_blank">
+            <ToastAction altText="View transaction">View txn</ToastAction>
+          </a>
+        ),
+      });
+    } catch (err) {
+      props.setTxn(false);
+      return;
+    }
 
     /* 
       TODO #7: Set the isTxnInProgress prop to false
     */
-
+    props.setTxn(false);
   };
 
   return (
@@ -162,12 +204,14 @@ export default function StreamCreator(props: {
                 <DialogHeader>
                   <DialogTitle>What are the valid units?</DialogTitle>
                   <DialogDescription>
-                    The valid units are: &quot;second&quot;, &quot;minute&quot;, &quot;hour&quot;, &quot;day&quot;,
-                    &quot;week&quot;, &quot;month&quot;, &quot;year&quot; (with or without &quot;s&quot; at the end).
+                    The valid units are: &quot;second&quot;, &quot;minute&quot;,
+                    &quot;hour&quot;, &quot;day&quot;, &quot;week&quot;,
+                    &quot;month&quot;, &quot;year&quot; (with or without
+                    &quot;s&quot; at the end).
                     <br />
                     <br />
-                    For example, a valid duration is &quot;1 month&quot;, &quot;2 years&quot;, &quot;3.5
-                    days&quot;, etc.
+                    For example, a valid duration is &quot;1 month&quot;,
+                    &quot;2 years&quot;, &quot;3.5 days&quot;, etc.
                   </DialogDescription>
                 </DialogHeader>
               </DialogContent>
