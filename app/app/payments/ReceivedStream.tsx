@@ -1,15 +1,8 @@
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import {
-  CopyIcon,
-  Cross2Icon,
-} from "@radix-ui/react-icons";
+import { CopyIcon, Cross2Icon } from "@radix-ui/react-icons";
 import { useState } from "react";
 import CountUp from "react-countup";
 import {
@@ -61,7 +54,12 @@ export function parseDurationShort(durationMilliseconds: number): string {
 }
 
 type Event = {
-  type: "stream_created" | "stream_accepted" | "stream_claimed" | "stream_cancelled" | "unknown";
+  type:
+    | "stream_created"
+    | "stream_accepted"
+    | "stream_claimed"
+    | "stream_cancelled"
+    | "unknown";
   timestamp: number;
   data: {
     amount?: number;
@@ -113,10 +111,17 @@ export default function ReceivedStream(props: {
     /* 
       TODO: Set the isTxnInProgress prop to true
     */
+    props.setTxn(true);
 
     /* 
       TODO: Create the payload for the claim_stream transaction
     */
+    const body = {
+      type: "FunctionCall",
+      function: "claim_stream",
+      type_arguments: ["sender_address"],
+      arguments: [props.senderAddress],
+    };
 
     /* 
       TODO: In a try/catch block, sign and submit the transaction using the signAndSubmitTransaction
@@ -139,11 +144,32 @@ export default function ReceivedStream(props: {
         ),
       });
     */
+    try {
+      const res = await signAndSubmitTransaction(body);
+      if (!res.ok) {
+        props.setTxn(false);
+        return;
+      }
+      toast({
+        title: "APT claimed!",
+        action: (
+          <a
+            href={`PLACEHOLDER: Input the link to the transaction on the explorer here`}
+            target="_blank"
+          >
+            <ToastAction altText="View transaction">View txn</ToastAction>
+          </a>
+        ),
+      });
+    } catch (err) {
+      props.setTxn(false);
+      return;
+    }
 
     /* 
       TODO: Set the isTxnInProgress prop to false
     */
-
+    props.setTxn(false);
   };
 
   /* 
@@ -153,11 +179,16 @@ export default function ReceivedStream(props: {
     /* 
       TODO: Set the isTxnInProgress prop to true
     */
-
+    props.setTxn(true);
     /* 
       TODO: Create the payload for the accept_stream transaction
     */
-
+    const body = {
+      type: "FunctionCall",
+      function: "accept_stream",
+      type_arguments: ["sender_address"],
+      arguments: [props.senderAddress],
+    };
     /* 
       TODO: In a try/catch block, sign and submit the transaction using the signAndSubmitTransaction
             function provided by the wallet adapter. Use the payload created above.
@@ -179,11 +210,31 @@ export default function ReceivedStream(props: {
         ),
       });
     */
-
+    try {
+      const res = await signAndSubmitTransaction(body);
+      if (!res.ok) {
+        props.setTxn(false);
+        return;
+      }
+      toast({
+        title: "Stream accepted!",
+        action: (
+          <a
+            href={`PLACEHOLDER: Input the link to the transaction on the explorer here`}
+            target="_blank"
+          >
+            <ToastAction altText="View transaction">View txn</ToastAction>
+          </a>
+        ),
+      });
+    } catch (err) {
+      props.setTxn(false);
+      return;
+    }
     /* 
       TODO: Set the isTxnInProgress prop to false
     */
-
+    props.setTxn(false);
   };
 
   /* 
@@ -193,15 +244,22 @@ export default function ReceivedStream(props: {
     /* 
       TODO: Return if the account is not defined
     */
-
+    if (!account) {
+      return;
+    }
     /* 
       TODO: Set the isTxnInProgress prop to true
     */
-
+    props.setTxn(true);
     /* 
       TODO: Create the payload for the cancel_stream transaction
     */
-  
+    const body = {
+      type: "FunctionCall",
+      function: "cancel_stream",
+      type_arguments: ["sender_address", "receiver_address"],
+      arguments: [account.address, account.address], // Here I am not sure what will be the receiver_address using the same address
+    };
     /* 
       TODO: In a try/catch block, sign and submit the transaction using the signAndSubmitTransaction
             function provided by the wallet adapter. Use the payload created above.
@@ -223,11 +281,31 @@ export default function ReceivedStream(props: {
         ),
       });
     */
-
+    try {
+      const res = await signAndSubmitTransaction(body);
+      if (!res.ok) {
+        props.setTxn(false);
+        return;
+      }
+      toast({
+        title: "Stream rejected",
+        action: (
+          <a
+            href={`PLACEHOLDER: Input the link to the transaction on the explorer here`}
+            target="_blank"
+          >
+            <ToastAction altText="View transaction">View txn</ToastAction>
+          </a>
+        ),
+      });
+    } catch (err) {
+      props.setTxn(false);
+      return;
+    }
     /* 
       TODO: Set the isTxnInProgress prop to false
     */
-
+    props.setTxn(false);
   };
 
   /* 
@@ -238,7 +316,6 @@ export default function ReceivedStream(props: {
       TODO: Fetch the event of the event_store_name from the event store and return the result in 
             a promise. 
     */
-
   };
 
   /* 
@@ -248,7 +325,6 @@ export default function ReceivedStream(props: {
     /* 
       TODO: Use the getEventList function to fetch all the events from the event store. 
     */
-
     /* 
       TODO: Set the events state with events for the specific stream only. Parse the event data to match the 
             Event type above. 
@@ -258,7 +334,6 @@ export default function ReceivedStream(props: {
         - Use the event.type to determine the type of the event to properly parse the event data
         - Remember to convert units when necessary
     */
-
   };
 
   return (
@@ -272,8 +347,7 @@ export default function ReceivedStream(props: {
               width={22}
               height={22}
             />
-            {
-              /* 
+            {/* 
                 TODO: Display the different amount based on the stream status
 
                 HINT: 
@@ -300,12 +374,9 @@ export default function ReceivedStream(props: {
 
                 -- static amount --
                 <p>{props.amountAptFloat}</p>
-              */
-              
-            }
+              */}
 
-            {
-              /* 
+            {/* 
                 TODO: Show the reject button only if the stream is not completed 
 
                 HINT: 
@@ -320,12 +391,10 @@ export default function ReceivedStream(props: {
                     </p>
                   </div>
                 </div>
-              */
-            }
+              */}
           </div>
 
-          {
-            /* 
+          {/* 
               TODO: Show the progress bar based on the stream status
 
               HINT: 
@@ -346,8 +415,7 @@ export default function ReceivedStream(props: {
                 max={100}
                 className="w-full bg-green-500 h-3 rounded"
               />
-              */
-          }
+              */}
 
           <div className="flex flex-row items-center justify-between w-full">
             <Dialog>
@@ -374,8 +442,7 @@ export default function ReceivedStream(props: {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {
-                      /* 
+                    {/* 
                         TODO: Show a skeleton row if the events array is empty
 
                         HINT: 
@@ -399,10 +466,8 @@ export default function ReceivedStream(props: {
                             </div>
                           </TableCell>
                         </TableRow>
-                      */
-                    }
-                    {
-                      /* 
+                      */}
+                    {/* 
                         TODO: Display each event in the events array with the following format:
                       
                         -- table row -- 
@@ -459,8 +524,7 @@ export default function ReceivedStream(props: {
                                 </>
                           </TableCell>
                         </TableRow>
-                      */
-                    }
+                      */}
                   </TableBody>
                 </Table>
               </DialogContent>
@@ -518,8 +582,7 @@ export default function ReceivedStream(props: {
               </Tooltip>
             </TooltipProvider>
           </div>
-          {
-            /* 
+          {/* 
               TODO: Display the end time if the stream has been accepted
 
               -- end time --
@@ -531,10 +594,8 @@ export default function ReceivedStream(props: {
                   ).toLocaleString()}
                 </p>
               </div>
-            */
-          }
-          {
-            /* 
+            */}
+          {/* 
               TODO: Display the duration if the stream has not been accepted yet
 
               -- duration --
@@ -544,15 +605,13 @@ export default function ReceivedStream(props: {
                   {parseDurationShort(props.durationSeconds * 1000)}
                 </span>
               </div>
-            */
-          }
+            */}
         </div>
       </CardContent>
 
       <CardFooter>
         <div className="flex flex-row justify-between w-full gap-4 p-4">
-          {
-            /* 
+          {/* 
               TODO: Display the claim button if the stream is active (accepted, but not completed) and 
               the accept button if the stream is not accepted yet.
 
@@ -571,10 +630,8 @@ export default function ReceivedStream(props: {
               >
                 Accept
               </Button>
-            */
-          }
-          {
-            /* 
+            */}
+          {/* 
               TODO: Display the reject button if the stream is active (accepted, but not completed) and
               the accept button if the stream is not accepted yet.
             
@@ -585,8 +642,7 @@ export default function ReceivedStream(props: {
               >
                 Reject
               </Button>
-            */ 
-          }
+            */}
         </div>
       </CardFooter>
     </Card>
